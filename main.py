@@ -46,8 +46,8 @@ def get_leaderboard_xml(leaderboard: str):
     """
     If leaderboard xml cache does not exist, download it
     """
-    os.makedirs(os.path.dirname(get_xml_cache_name(leaderboard)), exist_ok=True)
-    if len(os.listdir(get_xml_cache_name(leaderboard))) == 0:
+    os.makedirs(os.path.dirname(get_xml_cache_name(leaderboard) + '/'), exist_ok=True)
+    if len(os.listdir(get_xml_cache_name(leaderboard) + '/')) == 0:
         download_xml(leaderboard)
 
 
@@ -82,14 +82,14 @@ def get_leaderboard_df(leaderboard: str):
 
 def rivals2_plot(combined_df: pd.DataFrame, name):
     """
-    Creates a rank histogram specific to Rivals of Aether II ranked lite
+    Creates a rank histogram specific to Rivals of Aether II ranked
     """
-    bin_edges = [0, 500, 700, 900, 1100, 1300, 1500, combined_df['score'].max() + 1]
-    bin_labels = ['Stone', 'Bronze', 'Silver', 'Gold', 'Plat', 'Diamond', 'Master']
-    colors = ['#A9A9A9', '#CD7F32', '#C0C0C0', '#FFD700', '#E5E4E2', '#00BFFF', '#98FB98']
+    bin_edges = [0, 500, 700, 900, 1100, 1300, 1500, 1700, 1800, combined_df['score'].max() + 1]
+    bin_labels = ['Stone', 'Bronze', 'Silver', 'Gold', 'Plat', 'Diamond', 'Master', 'Grandmaster', 'Aetherean']
+    colors = ['#A9A9A9', '#CD7F32', '#C0C0C0', '#FFD700', '#E5E4E2', '#00BFFF', '#98FB98', '#E23939', "#F31BE1"]
 
     # Create a new labels list that includes the bin ranges
-    custom_labels = ['Stone 0-499', 'Bronze 500-699', ' Silver 700-899', 'Gold 900-1099', 'Plat 1100-1299', 'Diamond 1300-1499', 'Master 1500+']
+    bin_ranges = ['0-499', '500-699', '700-899', '900-1099', '1100-1299', '1300-1499', '1500-1699', '1700-1799', '1800+']
 
     # Categorize the scores into the custom bins
     ranked_bins = pd.cut(combined_df['score'], bins=bin_edges, labels=bin_labels, right=False)
@@ -100,15 +100,27 @@ def rivals2_plot(combined_df: pd.DataFrame, name):
     # Calculate the total number of players
     total_players = rank_counts.sum()
 
+    # Cumulative sum from right-to-left (Aetherean down to Stone)
+    cumulative_players_above = rank_counts[::-1].cumsum()[::-1]
+    
+    # Build custom labels dynamically
+    custom_labels = []
+    for rank, range_str in zip(bin_labels, bin_ranges):
+        # Calculate what percent of players are in this rank or higher
+        top_percent = (cumulative_players_above[rank] / total_players) * 100
+        
+        # Format the label with a newline break
+        custom_labels.append(f"{rank} {range_str}\nTop {top_percent:.1f}%")
+
     # Plotting
     plt.figure(figsize=(10, 8))
     bars = rank_counts.plot(kind='bar', color=colors, edgecolor='black')
     plt.xlabel('Rank')
     plt.ylabel('Number of Players')
-    plt.title(f'Rivals II Rank Distribution - {name} - {datetime.today().strftime('%Y-%m-%d')} - {total_players:,} total players')
+    plt.title(f'RoA 2 Rank Distribution - {name} - {datetime.today().strftime('%Y-%m-%d')} - {total_players:,} total players')
 
     # Rotate x-tick labels for better readability
-    plt.xticks(ticks=range(len(custom_labels)), labels=custom_labels, rotation=45)
+    plt.xticks(ticks=range(len(custom_labels)), labels=custom_labels, rotation=30)
 
     # Annotate each bar with percentage
     for bar in bars.patches:
