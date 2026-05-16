@@ -6,7 +6,7 @@ Quick script that uses steam's leaderboard [xml API](https://partner.steamgames.
 
 Using the leaderboard, and the ranked thresholds, we can create a visualization of the current leaderboard.
 
-![](./rank_distribution.png)
+![](./rank_distribution-spring-2026.png)
 
 
 # How to run

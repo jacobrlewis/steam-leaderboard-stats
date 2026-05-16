@@ -5,19 +5,28 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-XML_CACHE = './cache/xml/'
-DF_CACHE = './cache/df.pkl'
-
 # Rivals 2, ranked lite ids
 GAME_ID = '2217000'
-LEADERBOARD_ID = '14800950'
+LEADERBOARDS = {
+    'ranked-lite': '14800950',
+    'spring-2025': '16200142',
+    'summer-2025': '16915072',
+    'fall-2025': '17834843',
+    'winter-2026': '18722539',
+    'spring-2026': '19096871'
+}
 
+def get_df_cache_name(leaderboard: str):
+    return f'./cache/{leaderboard}/df.pkl'
 
-def download_xml():
+def get_xml_cache_name(leaderboard: str):
+    return f'./cache/{leaderboard}/xml'
+
+def download_xml(leaderboard: str):
     """
     Download and save each xml file provided by the steam xml api
     """
-    next_url = f'https://steamcommunity.com/stats/{GAME_ID}/leaderboards/{LEADERBOARD_ID}/?xml=1'
+    next_url = f'https://steamcommunity.com/stats/{GAME_ID}/leaderboards/{leaderboard}/?xml=1'
 
     while next_url is not None:
         xml_raw = requests.get(next_url).text
@@ -26,52 +35,52 @@ def download_xml():
         start = xml.find('entryStart').text.strip()
         end = xml.find('entryEnd').text.strip()
 
-        with open(f'{XML_CACHE}/{start}-{end}.xml', 'w') as file:
+        with open(f'{get_xml_cache_name(leaderboard)}/{start}-{end}.xml', 'w') as file:
             file.write(xml_raw)
             print(f'saved {file.name}')
         
         next_url = xml.find("nextRequestURL").text.strip() if xml.find("nextRequestURL") is not None else None
 
 
-def get_leaderboard_xml():
+def get_leaderboard_xml(leaderboard: str):
     """
-    If leaderboard xml does not exist, download it
+    If leaderboard xml cache does not exist, download it
     """
-    os.makedirs(os.path.dirname(XML_CACHE), exist_ok=True)
-    if len(os.listdir(XML_CACHE)) == 0:
-        download_xml()
+    os.makedirs(os.path.dirname(get_xml_cache_name(leaderboard)), exist_ok=True)
+    if len(os.listdir(get_xml_cache_name(leaderboard))) == 0:
+        download_xml(leaderboard)
 
 
-def xml_to_df():
+def xml_to_df(leaderboard: str):
     """
     Return a dataframe of leaderboard entrants from all xml files
     """
-    get_leaderboard_xml()
+    get_leaderboard_xml(leaderboard)
 
     all_dfs = []
-    for file_name in os.listdir(XML_CACHE):
-        file_path = os.path.join(XML_CACHE, file_name)
+    for file_name in os.listdir(get_xml_cache_name(leaderboard)):
+        file_path = os.path.join(get_xml_cache_name(leaderboard), file_name)
         df = pd.read_xml(file_path, xpath='.//entry')
         all_dfs.append(df)
 
     return pd.concat(all_dfs, ignore_index=True)
 
 
-def get_leaderboard_df():
+def get_leaderboard_df(leaderboard: str):
     """
     Find the leaderboard df in cache, or create a new one
     """
-    
-    if os.path.exists(DF_CACHE):
-        return pd.read_pickle(DF_CACHE)
+    df_cache_name = get_df_cache_name(leaderboard)
+    if os.path.exists(df_cache_name):
+        return pd.read_pickle(df_cache_name)
 
-    df = xml_to_df()
-    df.to_pickle(DF_CACHE)
-    print(f'saved {DF_CACHE}')
+    df = xml_to_df(leaderboard)
+    df.to_pickle(df_cache_name)
+    print(f'saved {df_cache_name}')
     return df
 
 
-def rivals2_plot(combined_df):
+def rivals2_plot(combined_df: pd.DataFrame, name):
     """
     Creates a rank histogram specific to Rivals of Aether II ranked lite
     """
@@ -96,7 +105,7 @@ def rivals2_plot(combined_df):
     bars = rank_counts.plot(kind='bar', color=colors, edgecolor='black')
     plt.xlabel('Rank')
     plt.ylabel('Number of Players')
-    plt.title(f'Rivals II Rank Distribution - {datetime.today().strftime('%Y-%m-%d')} - {total_players:,} total players')
+    plt.title(f'Rivals II Rank Distribution - {name} - {datetime.today().strftime('%Y-%m-%d')} - {total_players:,} total players')
 
     # Rotate x-tick labels for better readability
     plt.xticks(ticks=range(len(custom_labels)), labels=custom_labels, rotation=45)
@@ -112,10 +121,11 @@ def rivals2_plot(combined_df):
     
     # Save the plot
     plt.tight_layout()  # Adjust layout to make room for the x-axis labels
-    plt.savefig("rank_distribution.png", format="png", dpi=300)
+    plt.savefig(f'rank_distribution-{name}.png', format="png", dpi=300)
     plt.close()
 
 
 if __name__ == '__main__':
-    df = get_leaderboard_df()
-    rivals2_plot(df)
+    for name, leaderboard in LEADERBOARDS.items():
+        df = get_leaderboard_df(leaderboard)
+        rivals2_plot(df, name)
